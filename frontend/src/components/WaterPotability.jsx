@@ -691,7 +691,7 @@ const WaterPotability = () => {
                     { label: 'Точност', value: `${(data.metrics.final_accuracy * 100).toFixed(2)}%`, color: '#2563eb', icon: Target },
                     { label: 'Валидация', value: `${(data.metrics.best_val_accuracy * 100).toFixed(2)}%`, color: '#16a34a', icon: CheckCircle2 },
                     { label: 'Загуба', value: data.metrics.final_loss.toFixed(4), color: '#dc2626', icon: TrendingDown },
-                    { label: 'Десетки дървета', value: data.metrics.epochs_trained, color: '#f59e0b', icon: Network },
+                    { label: 'Брой дървета', value: data.metrics.epochs_trained, color: '#f59e0b', icon: Network },
                   ].map((metric, index) => {
                     const Icon = metric.icon;
                     return (
