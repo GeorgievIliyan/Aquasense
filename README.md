@@ -1,209 +1,209 @@
-# AquaSense - Система за анализ на питейност на водата
+# AquaSense - Water Potability Analysis System
 
-## Общо описание
+## Overview
 
-**AquaSense** е приложение, което използва машинно обучение за предсказание на питейност на водата. Системата се състои от три основни компонента:
+**AquaSense** is an application that uses machine learning to predict water potability. The system consists of three main components:
 
-1. **Flask REST API** - сървър, който обработва данни и обучава модела
-2. **React** - интерактивен потребителски интерфейс за визуализация и взаимодействие
-3. **Python Notebook (Colab)** - първоначалната среда за разработка и експериментиране
+1. **Flask REST API** - server that processes data and trains the model
+2. **React** - interactive user interface for visualization and interaction
+3. **Python Notebook (Colab)** - the initial development and experimentation environment
 
-Приложението анализира водни проби на базата на девет физико-химични параметра и предсказва дали водата е питейна или непитейна.
+The application analyzes water samples based on nine physico-chemical parameters and predicts whether the water is potable or non-potable.
 
 ---
 
-## Избор на алгоритъм
+## Algorithm Choice
 
-### Защо RandomForest?
+### Why RandomForest?
 
-При начално изследване на проблема, експериментирахме с няколко подхода:
+During initial investigation of the problem, we experimented with several approaches:
 
-1. **Невронни мрежи (TensorFlow/Keras)** - Изискваше усложнени техники за балансиране на класове (SMOTE, класови тегла, инверсия на етикети). Резултатите бяха хвърляви и по-скъпо в смисъл на изчисления.
+1. **Neural networks (TensorFlow/Keras)** - Required complicated techniques for class balancing (SMOTE, class weights, label inversion). Results were erratic and more computationally expensive.
 
-2. **Логистична регресия** - Линеен модел, неподходящ за нелинейната природа на данните за качество на водата.
+2. **Logistic regression** - A linear model, unsuitable for the nonlinear nature of water quality data.
 
-3. **Random Forest** - Избран окончателно. Причини:
-   - ✅ Отличен баланс между точност и скорост
-   - ✅ Автоматично се справя с нелинейни зависимости
-   - ✅ Не изисква сложна балансировка на класове
-   - ✅ Интерпретируем - лесно е да видим кои признаци са важни
+3. **Random Forest** - Chosen in the end. Reasons:
+   - ✅ Excellent balance between accuracy and speed
+   - ✅ Automatically handles nonlinear relationships
+   - ✅ Does not require complex class balancing
+   - ✅ Interpretable - easy to see which features matter
 
-### Конфигурация на модела
+### Model Configuration
 
 ```python
 RandomForestClassifier(
-    n_estimators=110,      # 100 решаващи дървета
-    max_depth=12,          # Максимална дълбочина на всяко дърво
-    min_samples_split=8,   # Минимум проби за разцепване на възел
-    min_samples_leaf=4,    # Минимум проби в лист възел
-    n_jobs=-1,             # Паралелно обучение
-    random_state=42        # Репродуцируемост
+    n_estimators=110,      # 100 decision trees
+    max_depth=12,          # Maximum depth of each tree
+    min_samples_split=8,   # Minimum samples to split a node
+    min_samples_leaf=4,    # Minimum samples in a leaf node
+    n_jobs=-1,             # Parallel training
+    random_state=42        # Reproducibility
 )
 ```
 
 ---
 
-## Структура на датасета
+## Dataset Structure
 
-### Източник на данни
+### Data Source
 
-Датасетът е от Kaggle: **`developerghost/water-potability`** (Watera.csv)
+The dataset is from Kaggle: **`developerghost/water-potability`** (Watera.csv)
 
-### Колони и описание
+### Columns and Description
 
-| Колона | Единица | Описание | Диапазон |
-|--------|---------|---------|----------|
-| **ph** | - | pH стойност на водата (киселинност/щелочност) | 0-14 |
-| **hardness** | mg/L | Твърдост на водата (калций + магнезий) | 0-500 |
-| **tds** | mg/L | Разтворени твърди вещества | 0-30000 |
-| **chlorine** | % | Концентрация на хлор | 0-100 |
-| **sulfate** | mg/L | Концентрация на сулфати | 0-1000 |
-| **conductivity** | µS/cm | Електрическа проводимост | 0-2000 |
-| **organic_carbon** | mg/L | Органичен въглерод (замърсители) | 0-100 |
-| **trihalomethanes** | µg/L | Триалометани (халогенни замърсители) | 0-500 |
-| **turbidity** | NTU | Мътност (видимост на водата) | 0-10 |
-| **potability** | 0/1 | **Целева променлива**: 0 = непитейна, 1 = питейна | - |
+| Column | Unit | Description | Range |
+|--------|------|-------------|-------|
+| **ph** | - | pH value of the water (acidity/alkalinity) | 0-14 |
+| **hardness** | mg/L | Water hardness (calcium + magnesium) | 0-500 |
+| **tds** | mg/L | Total dissolved solids | 0-30000 |
+| **chlorine** | % | Chlorine concentration | 0-100 |
+| **sulfate** | mg/L | Sulfate concentration | 0-1000 |
+| **conductivity** | µS/cm | Electrical conductivity | 0-2000 |
+| **organic_carbon** | mg/L | Organic carbon (contaminants) | 0-100 |
+| **trihalomethanes** | µg/L | Trihalomethanes (halogenated contaminants) | 0-500 |
+| **turbidity** | NTU | Turbidity (water clarity) | 0-10 |
+| **potability** | 0/1 | **Target variable**: 0 = non-potable, 1 = potable | - |
 
-### Съборка на данни
+### Data Sample
 
-- **Оригинални редове**: ~3276
-- **Премахнати**: ~676 (с липсващи стойности или дублирани)
-- **Финални редове**: ~2600
-- **Питейна вода**: ~1066 (41%)
-- **Непитейна вода**: ~1534 (59%)
+- **Original rows**: ~3276
+- **Removed**: ~676 (with missing or duplicate values)
+- **Final rows**: ~2600
+- **Potable water**: ~1066 (41%)
+- **Non-potable water**: ~1534 (59%)
 
-### Предварителна обработка
+### Preprocessing
 
-1. **Премахване на невалидни данни**:
-   - Отрицателни стойности → NaN
-   - pH извън диапазона [0, 14] → NaN
-   - Безкрайни стойности → NaN
+1. **Removing invalid data**:
+   - Negative values → NaN
+   - pH outside the range [0, 14] → NaN
+   - Infinite values → NaN
 
-2. **Попълване на липсващи стойности**:
-   - Медиана за всяка колона
+2. **Filling missing values**:
+   - Median for each column
 
-3. **Премахване на дублирани редове**
+3. **Removing duplicate rows**
 
-### Инженеринг на признаци
+### Feature Engineering
 
-Към оригиналните 9 признака добавихме 6 нови:
+We added 6 new features to the original 9:
 
 ```python
-log_tds = log(1 + tds)                                    # Логаритмична скала за TDS
-ph_acidity = |pH - 7|                                     # Отклонение от неутралност
-tds_conductivity = TDS / Conductivity                     # Съотношение
-tds_hardness = TDS / Hardness                             # Съотношение
-organic_tds = Organic_Carbon / TDS                        # Относителен органичен въглерод
-log_conductivity = log(1 + Conductivity)                  # Логаритмична скала
+log_tds = log(1 + tds)                                    # Logarithmic scale for TDS
+ph_acidity = |pH - 7|                                     # Deviation from neutrality
+tds_conductivity = TDS / Conductivity                     # Ratio
+tds_hardness = TDS / Hardness                             # Ratio
+organic_tds = Organic_Carbon / TDS                        # Relative organic carbon
+log_conductivity = log(1 + Conductivity)                  # Logarithmic scale
 ```
 
-Това помага на модела да уловява нелинейни зависимости и взаимодействия между параметрите.
+This helps the model capture nonlinear relationships and interactions between parameters.
 
 ---
 
-## Начин на работа - Стартиране на приложението
+## How It Works - Running the Application
 
-### Вариант 1: Google Colab (развойна среда)
+### Option 1: Google Colab (development environment)
 
-#### Необходими библиотеки
+#### Required Libraries
 
 ```python
 !pip install pandas numpy scikit-learn tensorflow kagglehub matplotlib seaborn
 ```
 
-#### Стъпки:
+#### Steps:
 
-1. **Отворете Google Colab**: https://colab.research.google.com
-2. **Создайте нова тетрадка** или отворете файла `ML.py`
-3. **Заредете чрез Kaggle**:
+1. **Open Google Colab**: https://colab.research.google.com
+2. **Create a new notebook** or open the `ML.py` file
+3. **Load via Kaggle**:
    ```python
    from kagglehub import KaggleDatasetAdapter
    import kagglehub
    
-   # При първия път ще бъдете помолени да се логнете на Kaggle
+   # On first run you will be asked to log in to Kaggle
    df = kagglehub.dataset_load(
        KaggleDatasetAdapter.PANDAS, 
        "developerghost/water-potability",
        "Watera.csv"
    )
    ```
-4. **Изпълнете клетките** по ред
-5. **Резултати**: Модел, матрица на объркване, графики на точност и загуба
+4. **Run the cells** in order
+5. **Results**: Model, confusion matrix, accuracy and loss charts
 
-#### Предимства на Colab:
-- ✅ Свободна GPU (за по-бързо обучение)
-- ✅ Не изисква локална инсталация
-- ✅ Интерактивна среда за експериментиране
-- ✅ Лесно дялене на резултати
+#### Advantages of Colab:
+- ✅ Free GPU (for faster training)
+- ✅ No local installation required
+- ✅ Interactive experimentation environment
+- ✅ Easy result sharing
 
 ---
 
-### Вариант 2: Flask + React (Production)
+### Option 2: Flask + React (Production)
 
-Това е пълното приложение с интерактивен интерфейс.
+This is the full application with an interactive interface.
 
-#### Предусловия
+#### Prerequisites
 
 - Python 3.8+
 - Node.js 14+
-- pip и npm
+- pip and npm
 
-#### A. Стартиране на Flask сървър
+#### A. Starting the Flask Server
 
-1. **Инсталиране на зависимости**:
+1. **Install dependencies**:
    ```bash
    pip install requirements.txt
    ```
 
-2. **Запуск на сървъра**:
+2. **Run the server**:
    ```bash
    python server.py
    ```
 
-3. **Проверка**:
-   - Отворете браузер: `http://localhost:5000/api/health`
-   - Очаквано: `{"status": "ok"}`
+3. **Verification**:
+   - Open browser: `http://localhost:5000/api/health`
+   - Expected: `{"status": "ok"}`
 
-#### B. Стартиране на React приложението
+#### B. Starting the React Application
 
-1. **Инсталиране на зависимости** (в папката на React проекта):
+1. **Install dependencies** (in the React project folder):
    ```bash
    npm install
    ```
 
-2. **Пускане на dev сървър**:
+2. **Start the dev server**:
    ```bash
    npm start
    ```
 
-3. **Отворете в браузър**:
+3. **Open in browser**:
    - `http://localhost:5173`
 
-#### C. Работни стъпки в приложението
+#### C. Working Steps in the Application
 
-1. **Табът "Данни"**:
-   - Кликнете "Зареди данни"
-   - Системата изтегля датасета, чисти го, генерира статистики и графики
-   - Видите: разпределение на pH, питейност, TDS, информация за колоните, корелационни коефициенти
+1. **"Data" tab**:
+   - Click "Load data"
+   - The system downloads the dataset, cleans it, generates statistics and charts
+   - You'll see: pH distribution, potability, TDS, column info, correlation coefficients
 
-2. **Табът "Обучение"**:
-   - Кликнете "Обучи модел"
-   - Системата тренира RandomForest на очищеното датасета
-   - Видите: точност, загуба, криви на обучение и валидиране
+2. **"Training" tab**:
+   - Click "Train model"
+   - The system trains a RandomForest on the cleaned dataset
+   - You'll see: accuracy, loss, training and validation curves
 
-3. **Табът "Прогноза"**:
-   - Въведете стойности за всеки параметър
-   - Кликнете "Предвиди питейност"
-   - Видите: резултат (питейна/непитейна) + увереност
+3. **"Prediction" tab**:
+   - Enter values for each parameter
+   - Click "Predict potability"
+   - You'll see: result (potable/non-potable) + confidence
 
 ---
 
 ## API Endpoints
 
 ### `GET /api/load-data`
-Зарежда и обработва датасета. Връща статистики, графични данни, информация за колоните и корелационни коефициенти.
+Loads and processes the dataset. Returns statistics, chart data, column info, and correlation coefficients.
 
-**Отговор**:
+**Response**:
 ```json
 {
   "success": true,
@@ -211,7 +211,7 @@ log_conductivity = log(1 + Conductivity)                  # Логаритмич
     "original_rows": 3276,
     "final_rows": 2600,
     "removed_rows": 676,
-    "potability_distribution": {"Питейна": 1066, "Непитейна": 1534},
+    "potability_distribution": {"Potable": 1066, "Non-potable": 1534},
     "missing_values": 123,
     "problematic_rows": 553
   },
@@ -226,9 +226,9 @@ log_conductivity = log(1 + Conductivity)                  # Логаритмич
 ```
 
 ### `GET /api/train-model`
-Обучава RandomForest модел. Връща метрики и криви на обучение.
+Trains a RandomForest model. Returns metrics and training curves.
 
-**Отговор**:
+**Response**:
 ```json
 {
   "success": true,
@@ -247,9 +247,9 @@ log_conductivity = log(1 + Conductivity)                  # Логаритмич
 ```
 
 ### `POST /api/predict`
-Предсказва питейност на водата на базата на параметрите.
+Predicts water potability based on the parameters.
 
-**Вход**:
+**Input**:
 ```json
 {
   "ph": 7.2,
@@ -264,13 +264,13 @@ log_conductivity = log(1 + Conductivity)                  # Логаритмич
 }
 ```
 
-**Отговор**:
+**Response**:
 ```json
 {
   "success": true,
   "result": {
     "potable": true,
-    "potability_label": "Питейна вода",
+    "potability_label": "Potable water",
     "confidence": 0.87,
     "confidence_percent": "87.00%"
   }
@@ -278,76 +278,75 @@ log_conductivity = log(1 + Conductivity)                  # Логаритмич
 ```
 
 ### `GET /api/get-statistics`
-Връща подробна статистика (средно, медиана, мин, макс, стд. откл.) за всеки параметър.
+Returns detailed statistics (mean, median, min, max, std. deviation) for each parameter.
 
 ### `GET /api/status`
-Проверка на състоянието на сървъра (данни заредени ли, модел обучен ли).
+Checks the server's state (whether data is loaded, whether the model is trained).
 
 ### `GET /api/health`
-Проста проверка дали сървърът е жив.
+Simple check whether the server is alive.
 
 ---
 
-## Структура на проекта
+## Project Structure
 
 ```
 Aquasense/
 ├── backend/
 ├── frontend/
-├── други
-└── README.md                    # Този файл
+├── other
+└── README.md                    # This file
 ```
 
 ---
 
-## Производителност и резултати
+## Performance and Results
 
-### Точност на модела
+### Model Accuracy
 
-- **Точност на обучение**: +99%
-- **Точност на валидиране**: +88%
-- **Загуба на валидиране**: ~0.01
+- **Training accuracy**: +99%
+- **Validation accuracy**: +88%
+- **Validation loss**: ~0.01
 
-### Време на обучение
+### Training Time
 
-- На **GPU (Colab)**: ~30-60 секунди
-- На **CPU (Laptop)**: ~1-2 минути
+- On **GPU (Colab)**: ~30-60 seconds
+- On **CPU (Laptop)**: ~1-2 minutes
 
-### Разпределение на класове
+### Class Distribution
 
-Датасетът е **дисбалансиран**: 92% непитейна вода, 8% питейна. RandomForest справя се добре с това без допълнителна балансировка.
+The dataset is **imbalanced**: 92% non-potable water, 8% potable. RandomForest handles this well without additional balancing.
 
 ---
 
-## Техни параметри на входа
+## Input Parameter Limits
 
-Приложението валидира всеки входен параметър:
+The application validates each input parameter:
 
-| Параметър | Минимум | Максимум | Единица |
-|-----------|---------|----------|---------|
+| Parameter | Minimum | Maximum | Unit |
+|-----------|---------|---------|------|
 | pH | 0 | 14 | - |
-| Твърдост | 0 | 500 | mg/L |
+| Hardness | 0 | 500 | mg/L |
 | TDS | 0 | 50000 | mg/L |
-| Хлор | 0 | 100 | % |
-| Сулфати | 0 | 1000 | mg/L |
-| Проводимост | 0 | 2000 | µS/cm |
-| Органичен въглерод | 0 | 100 | mg/L |
-| Триалометани | 0 | 500 | µg/L |
-| Мътност | 0 | 10 | NTU |
+| Chlorine | 0 | 100 | % |
+| Sulfate | 0 | 1000 | mg/L |
+| Conductivity | 0 | 2000 | µS/cm |
+| Organic carbon | 0 | 100 | mg/L |
+| Trihalomethanes | 0 | 500 | µg/L |
+| Turbidity | 0 | 10 | NTU |
 
 ---
 
-## Заключение
+## Conclusion
 
-AquaSense демонстрира мощния потенциал на машинното обучение за решаване на реални проблеми в анализа на качеството на водата. Чрез комбинирането на:
-- **RandomForest** алгоритъм (бърз, интерпретируем, точен)
-- **Feature engineering** (създаване на смисловни признаци)
-- **Интерактивен интерфейс** (React + Recharts)
+AquaSense demonstrates the powerful potential of machine learning for solving real-world problems in water quality analysis. By combining:
+- **RandomForest** algorithm (fast, interpretable, accurate)
+- **Feature engineering** (creating meaningful features)
+- **Interactive interface** (React + Recharts)
 
-Получих система, която е едновременно научна, практична и лесна за използване.
+I obtained a system that is scientific, practical, and easy to use all at once.
 
 ---
 
-**Дата на създаване**: 2026  
-**Език на интерфейса**: Български  
-**Лиценз**: MIT
+**Date created**: 2026  
+**License**: MIT

@@ -30,7 +30,6 @@ import {
   Zap,
   Database,
   Brain,
-  TrendingUp,
   TrendingDown,
   AlertCircle,
   CheckCircle2,
@@ -46,26 +45,11 @@ import TopNavbar from './TopNavbar';
 
 const WaterPotability = () => {
   const API_URL = 'http://localhost:5000/api';
-  const storageKey = 'water-potability-state';
 
-  const getStoredState = () => {
-    if (typeof window === 'undefined') return null;
-
-    try {
-      const saved = window.localStorage.getItem(storageKey);
-      return saved ? JSON.parse(saved) : null;
-    } catch {
-      return null;
-    }
-  };
-
-  const [state, setState] = useState(() => {
-    const stored = getStoredState();
-    return stored?.state || {
-      dataLoaded: false,
-      modelTrained: false,
-      activeTab: 0,
-    };
+  const [state, setState] = useState({
+    dataLoaded: false,
+    modelTrained: false,
+    activeTab: 0,
   });
 
   const [loading, setLoading] = useState({
@@ -74,65 +58,50 @@ const WaterPotability = () => {
     prediction: false,
   });
 
-  const [data, setData] = useState(() => {
-    const stored = getStoredState();
-    return stored?.data || {
-      stats: null,
-      chartData: null,
-      table: null,
-      statistics: null,
-      metrics: null,
-      trainingCharts: null,
-      info: null,
-      correlation: null,
-    };
+  const [data, setData] = useState({
+    stats: null,
+    chartData: null,
+    table: null,
+    statistics: null,
+    metrics: null,
+    trainingCharts: null,
+    info: null,
+    correlation: null,
   });
 
   const [alert, setAlert] = useState(null);
 
-  const [prediction, setPrediction] = useState(() => {
-    const stored = getStoredState();
-    return stored?.prediction || {
-      inputs: {
-        ph: 7.0,
-        hardness: 100.0,
-        solids: 5000.0,
-        chloramines: 5.0,
-        sulfate: 300.0,
-        conductivity: 400.0,
-        organic_carbon: 10.0,
-        trihalomethanes: 50.0,
-        turbidity: 3.0,
-      },
-      errors: {},
-      result: null,
-    };
+  const [prediction, setPrediction] = useState({
+    inputs: {
+      ph: 7.0,
+      hardness: 100.0,
+      tds: 5000.0,
+      chlorine: 5.0,
+      sulfate: 300.0,
+      conductivity: 400.0,
+      organic_carbon: 10.0,
+      trihalomethanes: 50.0,
+      turbidity: 3.0,
+    },
+    errors: {},
+    result: null,
   });
 
   const inputRanges = {
-    ph: { min: 0, max: 14, label: 'pH стойност' },
-    hardness: { min: 0, max: 500, label: 'Твърдост на водата' },
-    solids: { min: 0, max: 50000, label: 'Общо твърди вещества' },
-    chloramines: { min: 0, max: 100, label: 'Хлорамини' },
-    sulfate: { min: 0, max: 1000, label: 'Сулфати' },
-    conductivity: { min: 0, max: 2000, label: 'Проводимост' },
-    organic_carbon: { min: 0, max: 100, label: 'Органичен въглерод' },
-    trihalomethanes: { min: 0, max: 500, label: 'Трихалометани' },
-    turbidity: { min: 0, max: 10, label: 'Мътност' },
+    ph: { min: 0, max: 14, label: 'pH Value' },
+    hardness: { min: 0, max: 500, label: 'Water Hardness' },
+    tds: { min: 0, max: 50000, label: 'Total Dissolved Solids' },
+    chlorine: { min: 0, max: 100, label: 'Chlorine' },
+    sulfate: { min: 0, max: 1000, label: 'Sulfate' },
+    conductivity: { min: 0, max: 2000, label: 'Conductivity' },
+    organic_carbon: { min: 0, max: 100, label: 'Organic Carbon' },
+    trihalomethanes: { min: 0, max: 500, label: 'Trihalomethanes' },
+    turbidity: { min: 0, max: 10, label: 'Turbidity' },
   };
 
   useEffect(() => {
     checkStatus();
   }, []);
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-
-    window.localStorage.setItem(
-      storageKey,
-      JSON.stringify({ state, data, prediction })
-    );
-  }, [state, data, prediction]);
 
   const showAlert = (message, status = 'info') => {
     setAlert({ message, status });
@@ -149,7 +118,7 @@ const WaterPotability = () => {
         modelTrained: d.model_trained,
       }));
     } catch {
-      showAlert('Неуспешна връзка със сървъра', 'error');
+      showAlert('Failed to connect to server', 'error');
     }
   };
 
@@ -172,12 +141,12 @@ const WaterPotability = () => {
         }));
         setState((s) => ({ ...s, dataLoaded: true }));
         await fetchStatistics();
-        showAlert('Данните бяха заредени успешно', 'success');
+        showAlert('Data loaded successfully', 'success');
       } else {
-        showAlert(d.error || 'Зареждането не бе успешно', 'error');
+        showAlert(d.error || 'Loading failed', 'error');
       }
     } catch {
-      showAlert('Грешка при свързване', 'error');
+      showAlert('Connection error', 'error');
     } finally {
       setLoading((l) => ({ ...l, data: false }));
     }
@@ -200,7 +169,7 @@ const WaterPotability = () => {
     });
     setState((s) => ({ ...s, dataLoaded: false, modelTrained: false }));
     setPrediction((p) => ({ ...p, result: null }));
-    showAlert('Данните бяха изтрити', 'info');
+    showAlert('Data deleted', 'info');
   };
 
   const fetchStatistics = async () => {
@@ -217,7 +186,7 @@ const WaterPotability = () => {
 
   const handleTrainModel = async () => {
     if (!state.dataLoaded) {
-      showAlert('Първо зареди данни', 'warning');
+      showAlert('Load data first', 'warning');
       return;
     }
 
@@ -236,14 +205,14 @@ const WaterPotability = () => {
         }));
         setState((s) => ({ ...s, modelTrained: true }));
         showAlert(
-          `Моделът е обучен. Точност: ${(d.metrics.final_accuracy * 100).toFixed(2)}%`,
+          `Model trained. Accuracy: ${(d.metrics.final_accuracy * 100).toFixed(2)}%`,
           'success'
         );
       } else {
-        showAlert(d.error || 'Обучението не бе успешно', 'error');
+        showAlert(d.error || 'Training failed', 'error');
       }
     } catch {
-      showAlert('Грешка при свързване', 'error');
+      showAlert('Connection error', 'error');
     } finally {
       setLoading((l) => ({ ...l, training: false }));
     }
@@ -251,9 +220,9 @@ const WaterPotability = () => {
 
   const validateInput = (value, min, max) => {
     const num = parseFloat(value);
-    if (isNaN(num)) return 'Трябва да е число';
-    if (num < min) return `Минимум: ${min}`;
-    if (num > max) return `Максимум: ${max}`;
+    if (isNaN(num)) return 'Must be a number';
+    if (num < min) return `Minimum: ${min}`;
+    if (num > max) return `Maximum: ${max}`;
     return null;
   };
 
@@ -267,7 +236,7 @@ const WaterPotability = () => {
 
   const handlePredict = async () => {
     if (!state.modelTrained) {
-      showAlert('Първо обучи модела', 'warning');
+      showAlert('Train the model first', 'warning');
       return;
     }
 
@@ -280,7 +249,7 @@ const WaterPotability = () => {
 
     if (Object.keys(errors).length > 0) {
       setPrediction((p) => ({ ...p, errors }));
-      showAlert('Провери въведените стойности', 'error');
+      showAlert('Check the entered values', 'error');
       return;
     }
 
@@ -297,12 +266,12 @@ const WaterPotability = () => {
 
       if (d.success) {
         setPrediction((p) => ({ ...p, result: d.result }));
-        showAlert('Анализът е завършен', 'success');
+        showAlert('Analysis complete', 'success');
       } else {
-        showAlert(d.error || 'Прогнозата не бе успешна', 'error');
+        showAlert(d.error || 'Prediction failed', 'error');
       }
     } catch {
-      showAlert('Грешка при свързване', 'error');
+      showAlert('Connection error', 'error');
     } finally {
       setLoading((l) => ({ ...l, prediction: false }));
     }
@@ -310,9 +279,9 @@ const WaterPotability = () => {
 
   const COLORS = ['#ef4444', '#10b981'];
   const tabs = [
-    { label: 'Данни', icon: Database },
-    { label: 'Обучение', icon: Brain },
-    { label: 'Прогноза', icon: Target },
+    { label: 'Data', icon: Database },
+    { label: 'Training', icon: Brain },
+    { label: 'Prediction', icon: Target },
   ];
 
   const cardStyle = {
@@ -345,24 +314,24 @@ const WaterPotability = () => {
                 <HStack>
                   <Download size={36} color="#4c8baa" />
                   <VStack align="start" spacing={0} gap={0}>
-                    <Heading size="md">Зареди набор от данни</Heading>
+                    <Heading size="md">Load Dataset</Heading>
                     <Text fontSize="sm" color="gray.500">
-                      от Kaggle
+                      from Kaggle
                     </Text>
                   </VStack>
                 </HStack>
                 <HStack w="full" spacing={4}>
                   {!data.stats ? (
                     <Button onClick={handleLoadData} bg="#4c8baa" color="white" _hover={{ bg: '#3d6b88' }} borderRadius="lg" flex={1}>
-                      {loading.data ? <HStack spacing={2}><Spinner size="sm" /><Text>Зареждане...</Text></HStack> : 'Зареди данни'}
+                      {loading.data ? <HStack spacing={2}><Spinner size="sm" /><Text>Loading...</Text></HStack> : 'Load Data'}
                     </Button>
                   ) : (
                     <>
                       <Button onClick={handleUpdateData} bg="#f59e0b" color="white" _hover={{ bg: '#d97706' }} borderRadius="lg" flex={1} leftIcon={<RefreshCw size={18} />}>
-                        Обнови
+                        Refresh
                       </Button>
                       <Button onClick={handleDeleteData} bg="#ef4444" color="white" _hover={{ bg: '#dc2626' }} borderRadius="lg" flex={1} leftIcon={<Trash2 size={18} />}>
-                        Изтрий
+                        Delete
                       </Button>
                     </>
                   )}
@@ -375,35 +344,35 @@ const WaterPotability = () => {
                 <SimpleGrid columns={{ base: 1, sm: 2, md: 4 }} spacing={4}>
                   {[
                     {
-                      label: 'Общо проби',
+                      label: 'Total Samples',
                       value: data.stats.final_rows.toLocaleString(),
-                      hint: `Премахнати: ${data.stats.removed_rows}`,
+                      hint: `Removed: ${data.stats.removed_rows}`,
                       color: '#2563eb',
                       icon: BarChart3,
                     },
                     {
-                      label: 'Питейна вода',
-                      value: data.stats.potability_distribution.Питейна,
-                      hint: `${((data.stats.potability_distribution.Питейна / data.stats.final_rows) * 100).toFixed(1)}%`,
+                      label: 'Potable Water',
+                      value: data.stats.potability_distribution.Potable,
+                      hint: `${((data.stats.potability_distribution.Potable / data.stats.final_rows) * 100).toFixed(1)}%`,
                       color: '#16a34a',
                       icon: CheckCircle2,
                     },
                     {
-                      label: 'Липсващи стойности',
+                      label: 'Missing Values',
                       value: data.table
                         ? Object.values(data.table)
                           .flat()
                           .filter((value) => value === null || value === undefined || value === '')
                           .length
                         : 0,
-                      hint: 'Преди обработка',
+                      hint: 'Before processing',
                       color: '#dc2626',
                       icon: AlertCircle,
                     },
                     {
-                      label: 'Колони',
+                      label: 'Columns',
                       value: data.stats.shape[1] - 1,
-                      hint: 'Показатели за вода',
+                      hint: 'Water indicators',
                       color: '#f59e0b',
                       icon: Layers,
                     },
@@ -425,7 +394,7 @@ const WaterPotability = () => {
                 {data.chartData && (
                   <>
                     <Box {...cardStyle}>
-                      <Heading size="md" mb={6}>Разпределение по pH</Heading>
+                      <Heading size="md" mb={6}>pH Distribution</Heading>
                       <Box h={300} w="full">
                         <ResponsiveContainer width="100%" height="100%">
                           <AreaChart data={data.chartData.ph_distribution}>
@@ -447,16 +416,14 @@ const WaterPotability = () => {
                               stroke="#64748b"
                               domain={[0, 12000]}
                             />
-                            <Tooltip />
-                            <Area type="natural" dataKey="count" stroke="#4c8baa" fill="url(#gradPh)" strokeWidth={2} />
-
                             <Tooltip
                               labelFormatter={(value) => `pH: ${value}`}
                               formatter={(value) => [
-                                value.toLocaleString("bg-BG"),
-                                "Брой"
+                                value.toLocaleString('en-US'),
+                                'Count'
                               ]}
                             />
+                            <Area type="natural" dataKey="count" stroke="#4c8baa" fill="url(#gradPh)" strokeWidth={2} />
                           </AreaChart>
                         </ResponsiveContainer>
                       </Box>
@@ -464,7 +431,7 @@ const WaterPotability = () => {
 
                     <SimpleGrid columns={{ base: 1, md: 2 }} spacing={10} w="full" gapX={2}>
                       <Box {...cardStyle} minW={0}>
-                        <Heading size="md" mb={6}>Разпределение по питейност</Heading>
+                        <Heading size="md" mb={6}>Potability Distribution</Heading>
                         <Box h={300} minW={0}>
                           <ResponsiveContainer width="100%" height="100%">
                             <PieChart>
@@ -495,27 +462,13 @@ const WaterPotability = () => {
                       </Box>
 
                       <Box {...cardStyle} minW={0}>
-                        <Heading size="md" mb={6}>Разпределение по TDS</Heading>
+                        <Heading size="md" mb={6}>TDS Distribution</Heading>
 
                         <Box h={350} minW={0} overflowX="auto">
                           <Box minW="900px" h="100%">
                             <ResponsiveContainer width="100%" height="100%">
                               <BarChart
-                                data={data.chartData.tds_distribution.reduce((acc, item) => {
-                                  const existing = acc.find((x) => x.tds === item.tds);
-                                  const key = item.potability === "Питейна вода" ? "Питейна" : "Непитейна";
-
-                                  if (existing) {
-                                    existing[key] = item.count;
-                                  } else {
-                                    acc.push({
-                                      tds: item.tds,
-                                      [key]: item.count,
-                                    });
-                                  }
-
-                                  return acc;
-                                }, [])}
+                                data={data.chartData.tds_distribution}
                                 margin={{ top: 10, right: 20, left: 10, bottom: 20 }}
                                 barCategoryGap={8}
                               >
@@ -534,16 +487,16 @@ const WaterPotability = () => {
                                 <Legend />
 
                                 <Bar
-                                  dataKey="Непитейна"
-                                  name="Непитейна вода"
+                                  dataKey="Not Potable"
+                                  name="Not Potable Water"
                                   fill="#ef4444"
                                   radius={[4, 4, 0, 0]}
                                   barSize={18}
                                 />
 
                                 <Bar
-                                  dataKey="Питейна"
-                                  name="Питейна вода"
+                                  dataKey="Potable"
+                                  name="Potable Water"
                                   fill="#10b981"
                                   radius={[4, 4, 0, 0]}
                                   barSize={18}
@@ -560,17 +513,17 @@ const WaterPotability = () => {
                 {data.statistics && (
                   <>
                     <Box {...cardStyle}>
-                      <Heading size="md" mb={6}>Статистика на параметрите</Heading>
+                      <Heading size="md" mb={6}>Parameter Statistics</Heading>
                       <Box overflowX="auto">
                         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                           <thead>
                             <tr style={{ background: '#f3f4f5' }}>
-                              <th style={{ padding: '10px', textAlign: 'left' }}>Параметър</th>
-                              <th style={{ padding: '10px', textAlign: 'right' }}>Средно</th>
-                              <th style={{ padding: '10px', textAlign: 'right' }}>Медиана</th>
-                              <th style={{ padding: '10px', textAlign: 'right' }}>Мин.</th>
-                              <th style={{ padding: '10px', textAlign: 'right' }}>Макс.</th>
-                              <th style={{ padding: '10px', textAlign: 'right' }}>Стд. откл.</th>
+                              <th style={{ padding: '10px', textAlign: 'left' }}>Parameter</th>
+                              <th style={{ padding: '10px', textAlign: 'right' }}>Mean</th>
+                              <th style={{ padding: '10px', textAlign: 'right' }}>Median</th>
+                              <th style={{ padding: '10px', textAlign: 'right' }}>Min.</th>
+                              <th style={{ padding: '10px', textAlign: 'right' }}>Max.</th>
+                              <th style={{ padding: '10px', textAlign: 'right' }}>Std. Dev.</th>
                             </tr>
                           </thead>
                           <tbody>
@@ -597,15 +550,15 @@ const WaterPotability = () => {
 
                     {data.info && (
                       <Box {...cardStyle}>
-                        <Heading size="md" mb={6}>Информация за данните (df.info())</Heading>
+                        <Heading size="md" mb={6}>Data Info (df.info())</Heading>
                         <Box overflowX="auto">
                           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                             <thead>
                               <tr style={{ background: '#f3f4f5' }}>
-                                <th style={{ padding: '10px', textAlign: 'left' }}>Колона</th>
-                                <th style={{ padding: '10px', textAlign: 'left' }}>Тип</th>
-                                <th style={{ padding: '10px', textAlign: 'right' }}>Непразни</th>
-                                <th style={{ padding: '10px', textAlign: 'right' }}>Празни</th>
+                                <th style={{ padding: '10px', textAlign: 'left' }}>Column</th>
+                                <th style={{ padding: '10px', textAlign: 'left' }}>Type</th>
+                                <th style={{ padding: '10px', textAlign: 'right' }}>Non-Null</th>
+                                <th style={{ padding: '10px', textAlign: 'right' }}>Null</th>
                               </tr>
                             </thead>
                             <tbody>
@@ -631,13 +584,13 @@ const WaterPotability = () => {
 
                     {data.correlation && (
                       <Box {...cardStyle}>
-                        <Heading size="md" mb={6}>Корелация с potability</Heading>
+                        <Heading size="md" mb={6}>Correlation with Potability</Heading>
                         <Box overflowX="auto">
                           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                             <thead>
                               <tr style={{ background: '#f3f4f5' }}>
-                                <th style={{ padding: '10px', textAlign: 'left' }}>Параметър</th>
-                                <th style={{ padding: '10px', textAlign: 'right' }}>Корелация</th>
+                                <th style={{ padding: '10px', textAlign: 'left' }}>Parameter</th>
+                                <th style={{ padding: '10px', textAlign: 'right' }}>Correlation</th>
                               </tr>
                             </thead>
                             <tbody>
@@ -672,14 +625,14 @@ const WaterPotability = () => {
                 <HStack>
                   <Zap size={36} color="#4c8baa" />
                   <VStack align="start" spacing={0} gap={0}>
-                    <Heading size="md">Обучи модел</Heading>
+                    <Heading size="md">Train Model</Heading>
                     <Text fontSize="sm" color="gray.500">
-                      чрез Random Forest
+                      using Random Forest
                     </Text>
                   </VStack>
                 </HStack>
                 <Button onClick={handleTrainModel} bg="#4c8baa" color="white" _hover={{ bg: '#3d6b88' }} borderRadius="lg" w="full" disabled={!state.dataLoaded}>
-                  {loading.training ? <HStack spacing={2}><Spinner size="sm" /><Text>Обучение...</Text></HStack> : 'Обучи модел'}
+                  {loading.training ? <HStack spacing={2}><Spinner size="sm" /><Text>Training...</Text></HStack> : 'Train Model'}
                 </Button>
               </VStack>
             </Box>
@@ -688,10 +641,10 @@ const WaterPotability = () => {
               <>
                 <SimpleGrid columns={{ base: 1, sm: 2, md: 4 }} spacing={4}>
                   {[
-                    { label: 'Точност', value: `${(data.metrics.final_accuracy * 100).toFixed(2)}%`, color: '#2563eb', icon: Target },
-                    { label: 'Валидация', value: `${(data.metrics.best_val_accuracy * 100).toFixed(2)}%`, color: '#16a34a', icon: CheckCircle2 },
-                    { label: 'Загуба', value: data.metrics.final_loss.toFixed(4), color: '#dc2626', icon: TrendingDown },
-                    { label: 'Брой дървета', value: data.metrics.epochs_trained, color: '#f59e0b', icon: Network },
+                    { label: 'Accuracy', value: `${(data.metrics.final_accuracy * 100).toFixed(2)}%`, color: '#2563eb', icon: Target },
+                    { label: 'Validation', value: `${(data.metrics.best_val_accuracy * 100).toFixed(2)}%`, color: '#16a34a', icon: CheckCircle2 },
+                    { label: 'Loss', value: data.metrics.final_loss.toFixed(4), color: '#dc2626', icon: TrendingDown },
+                    { label: 'Number of Trees', value: data.metrics.epochs_trained, color: '#f59e0b', icon: Network },
                   ].map((metric, index) => {
                     const Icon = metric.icon;
                     return (
@@ -709,38 +662,34 @@ const WaterPotability = () => {
                 {data.trainingCharts && (
                   <>
                     <Box {...cardStyle}>
-                      <Heading size="md" mb={6}>Точност</Heading>
+                      <Heading size="md" mb={6}>Accuracy</Heading>
                       <Box h={350}>
                         <ResponsiveContainer width="100%" height="100%">
                           <AreaChart data={data.trainingCharts.accuracy}>
                             <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                            <XAxis dataKey="epoch" stroke="#64748b" ticks={[0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100, 105, 110]} />
-                            <YAxis
-                              stroke="#64748b"
-                              ticks={[92, 93, 94, 95, 96, 97, 98, 99, 100]}
-                              interval={0}
-                            />
+                            <XAxis dataKey="epoch" stroke="#64748b" />
+                            <YAxis stroke="#64748b" domain={['auto', 'auto']} />
                             <Tooltip />
                             <Legend />
-                            <Area type="monotone" dataKey="Обучение" stroke="#10b981" fill="#10b98120" strokeWidth={2} />
-                            <Area type="monotone" dataKey="Валидиране" stroke="#4c8baa" fill="#4c8baa20" strokeWidth={2} />
+                            <Area type="monotone" dataKey="Training" stroke="#10b981" fill="#10b98120" strokeWidth={2} />
+                            <Area type="monotone" dataKey="Validation" stroke="#4c8baa" fill="#4c8baa20" strokeWidth={2} />
                           </AreaChart>
                         </ResponsiveContainer>
                       </Box>
                     </Box>
 
                     <Box {...cardStyle}>
-                      <Heading size="md" mb={6}>Загуби</Heading>
+                      <Heading size="md" mb={6}>Loss</Heading>
                       <Box h={350}>
                         <ResponsiveContainer width="100%" height="100%">
                           <AreaChart data={data.trainingCharts.loss}>
                             <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                             <XAxis dataKey="epoch" stroke="#64748b" />
-                            <YAxis stroke="#64748b" domain={['dataMin - 0.05', 'dataMax + 0.05']} ticks={[0.001, 0.01, 0.05, 0.1, 0.2, 0.5, 1.0, 1.5, 2.0]} />
+                            <YAxis stroke="#64748b" domain={['dataMin - 0.05', 'dataMax + 0.05']} />
                             <Tooltip />
                             <Legend />
-                            <Area type="monotone" dataKey="Обучение" stroke="#ef4444" fill="#ef444420" strokeWidth={2} />
-                            <Area type="monotone" dataKey="Валидиране" stroke="#f97316" fill="#f9731620" strokeWidth={2} />
+                            <Area type="monotone" dataKey="Training" stroke="#ef4444" fill="#ef444420" strokeWidth={2} />
+                            <Area type="monotone" dataKey="Validation" stroke="#f97316" fill="#f9731620" strokeWidth={2} />
                           </AreaChart>
                         </ResponsiveContainer>
                       </Box>
@@ -760,7 +709,7 @@ const WaterPotability = () => {
                   <Target size={36} color="#4c8baa" />
                   <VStack align="start" gap={1}>
                     <Heading size="md" lineHeight="1.1" m={0}>
-                      Прогноза за питейност на водата
+                      Water Potability Prediction
                     </Heading>
                     <Text
                       fontSize="sm"
@@ -768,7 +717,7 @@ const WaterPotability = () => {
                       lineHeight="1.2"
                       m={0}
                     >
-                      Въведи параметри на водата за прогноза
+                      Enter water parameters for prediction
                     </Text>
                   </VStack>
                 </HStack>
@@ -788,7 +737,7 @@ const WaterPotability = () => {
                 </SimpleGrid>
 
                 <Button onClick={handlePredict} bg="#4c8baa" color="white" _hover={{ bg: '#3d6b88' }} borderRadius="lg" w="full" disabled={!state.modelTrained}>
-                  {loading.prediction ? <HStack spacing={2}><Spinner size="sm" /><Text>Анализиране...</Text></HStack> : 'Предвиди питейност'}
+                  {loading.prediction ? <HStack spacing={2}><Spinner size="sm" /><Text>Analyzing...</Text></HStack> : 'Predict Potability'}
                 </Button>
               </VStack>
             </Box>
@@ -801,8 +750,8 @@ const WaterPotability = () => {
                   <Box w="full" h="10px" bg={prediction.result.potable ? '#dcfce7' : '#fee2e2'} borderRadius="full" overflow="hidden">
                     <Box h="100%" w={`${prediction.result.confidence * 100}%`} bg={prediction.result.potable ? '#16a34a' : '#dc2626'} />
                   </Box>
-                  <Text fontSize="sm" color="gray.600">Увереност: {prediction.result.confidence_percent}</Text>
-                  <Text fontSize="xs" color="gray.500">Суров резултат: {prediction.result.confidence.toFixed(4)}</Text>
+                  <Text fontSize="sm" color="gray.600">Confidence: {prediction.result.confidence_percent}</Text>
+                  <Text fontSize="xs" color="gray.500">Raw score: {prediction.result.confidence.toFixed(4)}</Text>
                 </VStack>
               </Box>
             )}

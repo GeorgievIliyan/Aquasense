@@ -42,32 +42,41 @@ def prepare_features(X):
 @app.route('/api/load-data', methods=['GET'])
 def load_data():
   global df, df_original, feature_columns
-  
+
   try:
     df = kagglehub.dataset_load(KaggleDatasetAdapter.PANDAS, "developerghost/water-potability", "Watera.csv")
+    print(f"[DEBUG] Raw columns: {list(df.columns)}", file=sys.stderr)
+    print(f"[DEBUG] Shape before clean: {df.shape}", file=sys.stderr)
+    
+    df.columns = [c.strip().lower().replace(' ', '_') for c in df.columns]
+    print(f"[DEBUG] Normalized columns: {list(df.columns)}", file=sys.stderr)
+    
+    if 'solids' in df.columns and 'tds' not in df.columns:
+      df.rename(columns={'solids': 'tds'}, inplace=True)
+    print(f"[DEBUG] After alias: {list(df.columns)}", file=sys.stderr)
     df_original = df.copy()
     original_rows = len(df)
-    
+
     columns_to_drop = [col for col in ["Unnamed: 0", "blank1", "blank2", "index"] if col in df.columns]
     df.drop(columns=columns_to_drop, inplace=True)
     df.replace([np.inf, -np.inf], np.nan, inplace=True)
     df.dropna(subset=["potability"], inplace=True)
     df.drop_duplicates(inplace=True)
-    
+
     numeric_cols = df.select_dtypes(include=[np.number]).columns.drop("potability")
     df[numeric_cols] = df[numeric_cols].mask(df[numeric_cols] < 0, np.nan)
     df["ph"] = df["ph"].mask((df["ph"] < 0) | (df["ph"] > 14), np.nan)
-    
+
     missing_before = df_original.isnull().sum().sum()
     problematic_rows = original_rows - len(df)
-    
+
     for col in numeric_cols:
       df[col] = df[col].fillna(df[col].median())
-    
+
     final_rows = len(df)
     removed_rows = original_rows - final_rows
     potability_counts = df["potability"].value_counts().sort_index().to_dict()
-    
+
     ph_data = []
     ph_bins = np.linspace(df["ph"].min(), df["ph"].max(), 25)
     hist, _ = np.histogram(df["ph"], bins=ph_bins)
@@ -76,27 +85,27 @@ def load_data():
         "ph": round((ph_bins[i] + ph_bins[i+1]) / 2, 2),
         "count": int(hist[i])
       })
-    
+
     potability_data = [
-      {"name": "Непитейна", "value": int(potability_counts.get(0, 0))},
-      {"name": "Питейна", "value": int(potability_counts.get(1, 0))}
+      {"name": "Not Potable", "value": int(potability_counts.get(0, 0))},
+      {"name": "Potable", "value": int(potability_counts.get(1, 0))}
     ]
-    
+
     tds_data = []
     tds_values = df["tds"].values
     tds_min, tds_max = tds_values.min(), tds_values.max()
     tds_bins = np.linspace(tds_min, tds_max, 15)
-    
+
     for i in range(len(tds_bins) - 1):
       bin_center = round((tds_bins[i] + tds_bins[i+1]) / 2, 2)
       non_potable_count = len(df[(df["potability"] == 0) & (df["tds"] >= tds_bins[i]) & (df["tds"] < tds_bins[i+1])])
       potable_count = len(df[(df["potability"] == 1) & (df["tds"] >= tds_bins[i]) & (df["tds"] < tds_bins[i+1])])
       tds_data.append({
         "tds": bin_center,
-        "Непитейна": non_potable_count,
-        "Питейна": potable_count
+        "Not Potable": non_potable_count,
+        "Potable": potable_count
       })
-    
+
     df_info = []
     for col in df.columns:
       df_info.append({
@@ -105,7 +114,7 @@ def load_data():
         "non_null": int(df[col].notna().sum()),
         "null_count": int(df[col].isna().sum())
       })
-    
+
     correlation_data = []
     corr = df.corr(numeric_only=True)["potability"].drop("potability").sort_values(ascending=False)
     for col, val in corr.items():
@@ -113,7 +122,7 @@ def load_data():
         "feature": col,
         "correlation": round(float(val), 4)
       })
-    
+
     return jsonify({
       'success': True,
       'stats': {
@@ -123,8 +132,8 @@ def load_data():
         'columns': list(df.columns),
         'shape': [int(final_rows), len(df.columns)],
         'potability_distribution': {
-          "Непитейна": int(potability_counts.get(0, 0)),
-          "Питейна": int(potability_counts.get(1, 0))
+          "Not Potable": int(potability_counts.get(0, 0)),
+          "Potable": int(potability_counts.get(1, 0))
         },
         'missing_values': int(missing_before),
         'problematic_rows': int(problematic_rows),
@@ -137,88 +146,91 @@ def load_data():
       'info': df_info,
       'correlation': correlation_data
     }), 200
-    
+
   except Exception as e:
     return jsonify({'success': False, 'error': str(e)}), 400
 
 @app.route('/api/train-model', methods=['GET'])
 def train_model():
   global df, model, scaler, feature_columns, history, training_complete, y_train, y_pred
-  
+
   try:
     if df is None:
       return jsonify({'success': False, 'error': 'Data not loaded'}), 400
-    
+
     X = df.drop('potability', axis=1).copy()
     y = df['potability'].copy()
-    
+
     X = prepare_features(X)
     feature_columns = X.columns.tolist()
-    
+
     X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
-    
+
     scaler = StandardScaler()
     X_train_scaled = scaler.fit_transform(X_train)
     X_val_scaled = scaler.transform(X_val)
-    
+
     model = RandomForestClassifier(
       n_estimators=110,
       max_depth=12,
       min_samples_split=8,
       min_samples_leaf=4,
       n_jobs=-1,
-      random_state=42
+      random_state=42,
+      class_weight='balanced'
     )
-    
+
     model.fit(X_train_scaled, y_train)
-    
+
     train_acc = model.score(X_train_scaled, y_train)
     val_acc = model.score(X_val_scaled, y_val)
-    
+
     y_pred = model.predict(X_train_scaled)
-    
+
     history = {'accuracy': [], 'val_accuracy': [], 'loss': [], 'val_loss': []}
-    
+
     for i in range(len(model.estimators_)):
       tree_pred_train = np.mean([est.predict(X_train_scaled) for est in model.estimators_[:i+1]], axis=0)
       tree_pred_val = np.mean([est.predict(X_val_scaled) for est in model.estimators_[:i+1]], axis=0)
-      
+
       acc_train = np.mean(tree_pred_train.round() == y_train)
       acc_val = np.mean(tree_pred_val.round() == y_val)
-      
+
       pred_train = tree_pred_train
       pred_val = tree_pred_val
-      
+
       eps = 1e-15
       pred_train_clipped = np.clip(pred_train, eps, 1 - eps)
       pred_val_clipped = np.clip(pred_val, eps, 1 - eps)
-      
+
       loss_train = -np.mean(y_train * np.log(pred_train_clipped) + (1 - y_train) * np.log(1 - pred_train_clipped))
       loss_val = -np.mean(y_val * np.log(pred_val_clipped) + (1 - y_val) * np.log(1 - pred_val_clipped))
-      
+
       history['accuracy'].append(acc_train)
       history['val_accuracy'].append(acc_val)
       history['loss'].append(loss_train)
       history['val_loss'].append(loss_val)
-    
+
     accuracy_data = []
     for idx in range(len(history['accuracy'])):
       accuracy_data.append({
         "epoch": idx + 1,
-        "Обучение": round(float(history['accuracy'][idx]) * 100, 2),
-        "Валидиране": round(float(history['val_accuracy'][idx]) * 100, 2)
+        "Training": round(float(history['accuracy'][idx]) * 100, 2),
+        "Validation": round(float(history['val_accuracy'][idx]) * 100, 2)
       })
-    
+
     loss_data = []
     for idx in range(len(history['loss'])):
       loss_data.append({
         "epoch": idx + 1,
-        "Обучение": round(float(history['loss'][idx]), 4),
-        "Валидиране": round(float(history['val_loss'][idx]), 4)
+        "Training": round(float(history['loss'][idx]), 4),
+        "Validation": round(float(history['val_loss'][idx]), 4)
       })
-    
+
     training_complete = True
-    
+
+    print(f"[DEBUG] potability value_counts: {y.value_counts().to_dict()}", file=sys.stderr)
+    print(f"[DEBUG] model.classes_: {model.classes_}", file=sys.stderr)
     return jsonify({
       'success': True,
       'metrics': {
@@ -233,24 +245,24 @@ def train_model():
         'loss': loss_data,
       }
     }), 200
-    
+
   except Exception as e:
     return jsonify({'success': False, 'error': str(e)}), 400
 
 @app.route('/api/predict', methods=['POST'])
 def predict():
   global model, scaler, feature_columns, training_complete
-  
+
   try:
     if not training_complete or model is None:
       return jsonify({'success': False, 'error': 'Model not trained'}), 400
-    
+
     data = request.get_json()
     if not data:
       return jsonify({'success': False, 'error': 'No data'}), 400
-    
+
     required_fields = ['ph', 'hardness', 'tds', 'chlorine', 'sulfate', 'conductivity', 'organic_carbon', 'trihalomethanes', 'turbidity']
-    
+
     for field in required_fields:
       if field not in data:
         return jsonify({'success': False, 'error': f'Missing: {field}'}), 400
@@ -258,57 +270,57 @@ def predict():
         float(data[field])
       except (ValueError, TypeError):
         return jsonify({'success': False, 'error': f'Invalid: {field}'}), 400
-    
+
     input_df = pd.DataFrame([[
       float(data['ph']), float(data['hardness']), float(data['tds']),
       float(data['chlorine']), float(data['sulfate']),
       float(data['conductivity']), float(data['organic_carbon']),
       float(data['trihalomethanes']), float(data['turbidity'])
     ]], columns=['ph', 'hardness', 'tds', 'chlorine', 'sulfate', 'conductivity', 'organic_carbon', 'trihalomethanes', 'turbidity'])
-    
+
     input_df = prepare_features(input_df)
     input_df = input_df[feature_columns]
-    
+
     input_scaled = scaler.transform(input_df)
     probabilities = model.predict_proba(input_scaled)[0]
-    prob_potable = probabilities[1]
-    prob_non_potable = probabilities[0]
-    
+    prob_potable = probabilities[0]  # 1 = not potable, so 0 = potable
+    prob_non_potable = probabilities[1]
+
     threshold = 0.5
     prediction = 1 if prob_potable >= threshold else 0
-    
+
     if prediction == 1:
       result = {
         'potable': True,
-        'potability_label': 'Питейна вода',
+        'potability_label': 'Potable Water',
         'confidence': prob_potable,
         'confidence_percent': f'{prob_potable * 100:.2f}%'
       }
     else:
       result = {
         'potable': False,
-        'potability_label': 'Непитейна вода',
+        'potability_label': 'Not Potable Water',
         'confidence': prob_non_potable,
         'confidence_percent': f'{prob_non_potable * 100:.2f}%'
       }
-    
+
     return jsonify({'success': True, 'input': data, 'result': result}), 200
-    
+
   except Exception as e:
     return jsonify({'success': False, 'error': str(e)}), 400
 
 @app.route('/api/get-statistics', methods=['GET'])
 def get_statistics():
   global df
-  
+
   try:
     if df is None:
       return jsonify({'success': False, 'error': 'Data not loaded'}), 400
-    
+
     numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
     if 'potability' in numeric_cols:
       numeric_cols.remove('potability')
-    
+
     stats_data = []
     for col in numeric_cols:
       col_data = df[col]
@@ -322,7 +334,7 @@ def get_statistics():
         'q25': round(float(col_data.quantile(0.25)), 4),
         'q75': round(float(col_data.quantile(0.75)), 4)
       })
-    
+
     return jsonify({'success': True, 'statistics': stats_data}), 200
   except Exception as e:
     return jsonify({'success': False, 'error': str(e)}), 400
